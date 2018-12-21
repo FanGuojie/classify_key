@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 import torch.utils.data as Data
 from prehandle import quickload
-import torchvision
-from sklearn.preprocessing import OneHotEncoder
 
 # print("max:", np.max(train_data))
 # onehot_encoder = OneHotEncoder(sparse=False)
@@ -44,6 +42,7 @@ def load_test_data(filename):
 
 
 class CNN(nn.Module):
+
     def __init__(self):
         super(CNN, self).__init__()
 
@@ -54,11 +53,13 @@ class CNN(nn.Module):
                 kernel_size=5,  # filter size
                 stride=1,  # filter movement/step
                 padding=2,
-                # if want same width and length of this image after Conv2d, padding=(kernel_size-1)/2 if stride=1
+                # if want same width and length of this image after Conv2d,
+                # padding=(kernel_size-1)/2 if stride=1
             ),  # output shape (16, 28, 28)
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),  # activation
-            nn.MaxPool2d(kernel_size=2),  # choose max value in 2x2 area, output shape (16, 14, 14)
+            # choose max value in 2x2 area, output shape (16, 14, 14)
+            nn.MaxPool2d(kernel_size=2),
         )
         self.conv2 = nn.Sequential(  # input shape (16, 60, 80)
             nn.Conv2d(16, 32, 5, 1, 2),  # output shape (32, 60, 80)
@@ -110,7 +111,8 @@ class CNN(nn.Module):
         # x = self.conv7(x.float())
         # for i in range(3):
         #     x=self.conv(x.float())
-        x = x.view(x.size(0), -1)  # flatten the output of conv2 to (batch_size, 32 * 7 * 7)
+        # flatten the output of conv2 to (batch_size, 32 * 7 * 7)
+        x = x.view(x.size(0), -1)
         output = self.out(x)
         return output, x  # return x for visualization
 
@@ -139,11 +141,13 @@ def restore_params(model):
     model.out.load_state_dict(torch.load('out.pkl'))
 
 
-# following function (plot_with_labels) is for visualization, can be ignored if not interested
+# following function (plot_with_labels) is for visualization, can be
+# ignored if not interested
 def test(model, test_loader):
     model.eval()
     acc = np.array(0)
-    for step, (b_x, b_y) in enumerate(test_loader):  # gives batch data, normalize x when iterate train_loader
+    # gives batch data, normalize x when iterate train_loader
+    for step, (b_x, b_y) in enumerate(test_loader):
         b_x = b_x.cuda()
         test_output, _ = model(b_x)
         test_output = test_output.cuda()
@@ -151,7 +155,7 @@ def test(model, test_loader):
         acc += np.sum((pred_y == b_y.data.numpy()).astype(int))
         if(not save_model):
             print(acc)
-    accuracy = float(acc) / float((step+1)*test_loader.batch_size)
+    accuracy = float(acc) / float((step + 1) * test_loader.batch_size)
     return accuracy
 
 
@@ -161,7 +165,8 @@ def loadimg(path):
     img = cv2.imread(path, 0)
     for i in range(2):
         img = cv2.pyrDown(img)
-    img = ((img.reshape(-1) - 128) / 128).reshape(img.shape)[np.newaxis, np.newaxis]
+    img = ((img.reshape(-1) - 128) /
+           128).reshape(img.shape)[np.newaxis, np.newaxis]
     return img
 
 
@@ -175,7 +180,7 @@ def test_sample(model, data, label):
     print("real   : ", int(label))
 
 
-def init_dataloader(data, label,batch_size):
+def init_dataloader(data, label, batch_size):
     torch_dataset = Data.TensorDataset(data, label)
     # 把 dataset 放入 DataLoader
     loader = Data.DataLoader(
@@ -189,46 +194,64 @@ def init_dataloader(data, label,batch_size):
 
 
 def shuffleData(data, label):
-    print("shuffle data")
-    data=data.numpy()
-    label=label.numpy()
-    (n, _, l, w) = data.shape
-    data = data.reshape(n,-1)
-    label=label[:,np.newaxis]
-    datus = np.concatenate((data, label),axis=1)
+    # print("shuffle data")
+    (n, l, w) = data.shape
+    data = data.reshape(n, -1)
+    label = label[:, np.newaxis]
+    datus = np.concatenate((data, label), axis=1)
     # print(datus[:,-1][:10])
     np.random.shuffle(datus)
-    data = datus[:,:-1]
-    label = datus[:,-1]
+    data = datus[:, :-1]
+    label = datus[:, -1]
     # print(label[:10])
-    data = data.reshape(n, 1, l, w)
-    return torch.tensor(data), torch.tensor(label)
+    data = data.reshape(n, l, w)
+    return data,label
+
+file="data.npy"
+prop=0.8
+def getTrainTest():
+    data,label=quickload(file)
+    (n,_,_)=data.shape
+    data,label=shuffleData(data,label)
+    trainData=torch.tensor(data[:int(n*prop)][:, np.newaxis])
+    trainLabel=torch.tensor(label[:int(n*prop)])
+    testData=torch.tensor(data[int(n*prop):][:, np.newaxis])
+    testLabel=torch.tensor(label[int(n*prop):])
+    # return trainData,testData
+    return trainData,trainLabel,testData,testLabel
+
+
 
 def main():
     cnn = CNN()
     cnn.cuda()
 
-    optimizer = torch.optim.Adam(cnn.parameters(), lr=LR)  # optimize all cnn parameters
+    # optimize all cnn parameters
+    optimizer = torch.optim.Adam(cnn.parameters(), lr=LR)
     loss_func = nn.CrossEntropyLoss()  # the target label is not one-hotted
 
-    # training and testing
-    test_data, test_label = load_test_data("test.npy")
-    # test_data, test_label = shuffleData(test_data, test_label)
+    #get training and testing data and label
+    train_data,train_label,test_data,test_label=getTrainTest()
+    #init load
+    test_loader = init_dataloader(test_data, test_label, TEST_BATCH_SIZE)
+    train_loader = init_dataloader(train_data, train_label, TRAIN_BATCH_SIZE)
     if save_model:
-        train_data, train_label = load_train_data("train.npy")
+
         # train_data, train_label = quickload("test.npy")
         # test_data, test_label = quickload("train.npy")
         # 先转换成 torch 能识别的 Dataset
-        print("transfer train & test dataset , init Dataloader")
-        test_loader = init_dataloader(test_data, test_label,TEST_BATCH_SIZE)
+        test_loader = init_dataloader(test_data, test_label, TEST_BATCH_SIZE)
         print("start train")
         for epoch in range(EPOCH):
             if (epoch % 5 == 0):
-                train_data, train_label = shuffleData(train_data, train_label)
-            train_loader = init_dataloader(train_data, train_label,TRAIN_BATCH_SIZE)
+                train_data,train_label,test_data,test_label=getTrainTest()
+                # per 5 iter shuffle cross validation
+                test_loader = init_dataloader(test_data, test_label, TEST_BATCH_SIZE)
+                train_loader = init_dataloader(train_data, train_label, TRAIN_BATCH_SIZE)
 
             loss = 0
-            for step, (b_x, b_y) in enumerate(train_loader):  # gives batch data, normalize x when iterate train_loader
+            # gives batch data, normalize x when iterate train_loader
+            for step, (b_x, b_y) in enumerate(train_loader):
                 b_x = b_x.cuda()
                 b_y = b_y.cuda()
                 output = cnn(b_x)[0]  # cnn output
@@ -239,14 +262,15 @@ def main():
 
             accuracy = test(cnn, test_loader)
             train_loss = loss.cpu().data.numpy()
-            print('Epoch: ', epoch, '| train loss: %.4f' % train_loss, '| test accuracy: %.2f' % accuracy)
+            print('Epoch: ', epoch, '| train loss: %.4f' %
+                  train_loss, '| test accuracy: %.2f' % accuracy)
             # 保存参数
         save(cnn)
     else:
         # 恢复参数
         restore_params(cnn)
         test_data, test_label = load_train_data("test.npy")
-        test_loader = init_dataloader(test_data, test_label,TEST_BATCH_SIZE)
+        test_loader = init_dataloader(test_data, test_label, TEST_BATCH_SIZE)
         accuracy = test(cnn, test_loader)
         print("test accuracy:", accuracy)
         # sample_data = test_data[2].cpu().numpy()[np.newaxis]
@@ -259,5 +283,7 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # train_data, train_label = load_train_data("train.npy")
-    # train_data, train_label = shuffleData(train_data, train_label)
+    # for i in range(1,3):
+    #     print(i,":")
+    #     trainData,trainLabel,testData,testLabel=getTrainTest()
+    #     print(trainLabel[:20])

@@ -7,13 +7,11 @@ def generate_numpy_data(start, end):
     global data, img2
     print("generate numpy data from imgs")
 
-    def loadImg(j, k, m,first=True):
+    def loadImg(j, m):
         global img2
         try:
-            if(first):
-                img = cv2.imread('../_' + str(m + 1) + '/' + str(j) + "_" + str(k), 0)
-            else:
-                img = cv2.imread('../' + str(m + 1) + '/' + str(j) + "_" + str(k), 0)
+            img = cv2.imread('./' + str(m + 1) + '/' + str(j)+".png" , 0)
+
 
             for i in range(2):
                 img = cv2.pyrDown(img)
@@ -25,7 +23,7 @@ def generate_numpy_data(start, end):
                 data[m].append(flipped)
         except:
             # if not exist, then show last
-            print(m, "kind img", j, k, "doesn't exist")
+            print(m, "kind img", j, "doesn't exist")
             data[m].append(np.array(img2))
             for i in range(-1, 2):
                 flipped = cv2.flip(img2, i)
@@ -35,14 +33,7 @@ def generate_numpy_data(start, end):
     for k in range(3):
         print(k, ":")
         for i in range(start, end):
-            loadImg(i, 18, k)
-            loadImg(100 + i, 18, k)
-            loadImg(i, 30, k)
-            loadImg(100 + i, 30, k)
-            loadImg(i, 18, k,False)
-            loadImg(100 + i, 18, k,False)
-            loadImg(i, 30, k,False)
-            loadImg(100 + i, 30, k,False)
+            loadImg(i, k)
 
         data[k] = np.array(data[k])
     data = np.array(data)
@@ -112,7 +103,7 @@ def loadfile(filename, l, w):
 # testData, testLabel = loadfile("test_plus.npy",120,160)
 
 def quickload(filename):
-    print("quick load method")
+    # print("quick load method")
     data = np.load(filename)
     # normalization
     data = ((data.reshape(-1) - 128) / 128).reshape(data.shape)
@@ -136,9 +127,6 @@ def quickload(filename):
 if __name__ == '__main__':
     # train=np.load("train.npy")
     #save data
-    test=generate_numpy_data(41,51)
-    np.save("test.npy",test)
-    print(test.shape)
-    train=generate_numpy_data(1,41)
-    np.save("train.npy",train)
-    print(train.shape)
+    data=generate_numpy_data(1,201)
+    np.save("data.npy",data)
+    
